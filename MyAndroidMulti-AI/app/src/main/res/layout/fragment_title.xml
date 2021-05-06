@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".TitleFragment">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/titleConstraint"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="95dp"
+            android:layout_height="62dp"
+            android:layout_marginTop="20dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:srcCompat="@drawable/sos"
+            tools:src="@drawable/sos" />
+
+        <Button
+            android:id="@+id/button"
+            android:layout_width="91dp"
+            android:layout_height="39dp"
+            android:layout_marginTop="20dp"
+            android:text="@string/button_name"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/imageView" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</layout>
