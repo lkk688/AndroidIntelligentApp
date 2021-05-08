@@ -1,6 +1,7 @@
 package sjsu.cmpelkk.myandroidmulti.vision
 
 import android.content.Context
+import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.util.Log
@@ -8,8 +9,11 @@ import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import org.tensorflow.lite.Interpreter
 import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.FileChannel
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -22,8 +26,6 @@ class MyClassifier{ //(private val context: Context) {
         private const val PIXEL_SIZE = 1
 
         private const val OUTPUT_CLASSES_COUNT = 1001
-        private const val MODEL_NAME_KEY = "flower"//""classifierstart"
-        private const val QUANTIZED_model = true
     }
 
     private var interpreter: Interpreter? = null
@@ -33,9 +35,11 @@ class MyClassifier{ //(private val context: Context) {
     /** Executor to run inference task in the background */
     private val executorService: ExecutorService = Executors.newCachedThreadPool()
 
+    var QUANTIZED_model = false
     private var inputImageWidth: Int = 0 // will be inferred from TF Lite model
     private var inputImageHeight: Int = 0 // will be inferred from TF Lite model
     private var modelInputSize: Int = 0 // will be inferred from TF Lite model
+    var labels: ArrayList<String>? = null
 
     fun initialize(model: File): Task<Void> {
         return Tasks.call(
@@ -48,9 +52,14 @@ class MyClassifier{ //(private val context: Context) {
     }
 
     private fun initializeInterpreter(model: File) {
+        //load labels
+
+
+
         // Initialize TF Lite Interpreter with NNAPI enabled
         val options = Interpreter.Options()
         options.setUseNNAPI(true)
+
         var interpreter: Interpreter
         interpreter = Interpreter(model, options)
 //        if (model is ByteBuffer) {
@@ -63,6 +72,17 @@ class MyClassifier{ //(private val context: Context) {
         inputImageWidth = inputShape[1]
         inputImageHeight = inputShape[2]
         modelInputSize = FLOAT_TYPE_SIZE * inputImageWidth * inputImageHeight * PIXEL_SIZE * 3
+
+        //new add
+        val inputdatatype = interpreter.getInputTensor(0).dataType();//FLOAT32
+        if (inputdatatype.byteSize()==1)
+        {
+            QUANTIZED_model = true
+        }
+        val outputdataShape = interpreter.getOutputTensor(0).shape() //{1, NUM_CLASSES}
+        val probabilityDataType = interpreter.getOutputTensor(0).dataType() //FLOAT32
+        Log.d(TAG, "outputdataShape $outputdataShape.")
+        Log.d(TAG, "probabilityDataType $probabilityDataType.")
 
         // Finish interpreter initialization
         this.interpreter = interpreter
@@ -81,23 +101,31 @@ class MyClassifier{ //(private val context: Context) {
         // Preprocessing: resize the input
         startTime = System.nanoTime()
         val resizedImage = Bitmap.createScaledBitmap(bitmap, inputImageWidth, inputImageHeight, true)
-        val byteBuffer = convertBitmapToByterBuffer2(resizedImage)
+        val byteBuffer = convertBitmapToByterBuffer(resizedImage)
         elapsedTime = (System.nanoTime() - startTime) / 1000000
         Log.d(TAG, "Preprocessing time = " + elapsedTime + "ms")
 
         startTime = System.nanoTime()
-        val result = Array(1) { FloatArray(OUTPUT_CLASSES_COUNT) }
-
+        var index = 0
+        if (QUANTIZED_model)
+        {
+            val result = Array(1) { ByteArray(OUTPUT_CLASSES_COUNT) }
+            interpreter?.run(byteBuffer, result)
+            index = getMaxResultq(result[0])
+        }else {
+            val result = Array(1) { FloatArray(OUTPUT_CLASSES_COUNT) }
 //        val bufferSize = OUTPUT_CLASSES_COUNT * java.lang.Float.SIZE / java.lang.Byte.SIZE //1000*
 //        val result = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder())
-        interpreter?.run(byteBuffer, result)
+            interpreter?.run(byteBuffer, result)
+            index = getMaxResult(result[0])
+        }
 
         //interpreter?.run(byteBuffer, result)
         elapsedTime = (System.nanoTime() - startTime) / 1000000
         Log.d(TAG, "Inference time = " + elapsedTime + "ms")
 
-        var index = getMaxResult(result[0])
-        var stringresult = "Prediction is $index \nInference Time $elapsedTime ms"
+        val classname = labels?.get(index)
+        var stringresult = "Predicted index is $index, class is $classname \n Inference Time is $elapsedTime ms"
         return stringresult//getOutputString(result[0])
     }
 
@@ -117,8 +145,8 @@ class MyClassifier{ //(private val context: Context) {
     }
 
 
-    private fun convertBitmapToByterBuffer2(bitmap: Bitmap): ByteBuffer {
-        val bitmap = Bitmap.createScaledBitmap(bitmap, 224, 224, true)
+    private fun convertBitmapToByterBuffer(bitmap: Bitmap): ByteBuffer {
+        val bitmap = Bitmap.createScaledBitmap(bitmap, inputImageWidth, inputImageHeight, true)
         //val input = ByteBuffer.allocateDirect(224*224*3*4).order(ByteOrder.nativeOrder())
         val input = ByteBuffer.allocateDirect(modelInputSize).order(ByteOrder.nativeOrder())
         for (y in 0 until 224) {
@@ -144,7 +172,9 @@ class MyClassifier{ //(private val context: Context) {
         }
         return input
     }
-    private fun convertBitmapToByteBuffer(bitmap: Bitmap): ByteBuffer {
+
+    //change to grey image
+    private fun convertBitmapToByteBuffergrey(bitmap: Bitmap): ByteBuffer {
         val byteBuffer = ByteBuffer.allocateDirect(modelInputSize)
         byteBuffer.order(ByteOrder.nativeOrder())
 
@@ -176,8 +206,36 @@ class MyClassifier{ //(private val context: Context) {
         return index
     }
 
+    private fun getMaxResultq(result: ByteArray): Int {
+        val t0 = result[0].toFloat()
+        val t0b = result[0].toInt()
+        val t1 = result[1].toUInt()
+        val t2 = result[2].toFloat() / 255
+        val t3= result[3].toFloat()
+        val t4 = result[4].toFloat()
+        var probability = result[0].toUInt()
+        var index = 0
+        for (i in result.indices) {
+            if (probability < result[i].toUInt()) {
+                probability = result[i].toUInt()
+                index = i
+            }
+        }
+        return index
+    }
+
     private fun getOutputString(output: FloatArray): String {
         val maxIndex = output.indices.maxBy { output[it] } ?: -1
         return "Prediction Result: %d\nConfidence: %2f".format(maxIndex, output[maxIndex])
+    }
+
+    @Throws(IOException::class)
+    private fun loadModelFile(assetManager: AssetManager, filename: String): ByteBuffer {
+        val fileDescriptor = assetManager.openFd(filename)
+        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
+        val fileChannel = inputStream.channel
+        val startOffset = fileDescriptor.startOffset
+        val declaredLength = fileDescriptor.declaredLength
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
 }

@@ -1,11 +1,14 @@
 package sjsu.cmpelkk.myandroidmulti.vision
 
+import android.app.Application
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.google.android.gms.tasks.Task
@@ -23,19 +26,44 @@ import com.google.firebase.ml.modeldownloader.DownloadType
 import com.google.firebase.ml.modeldownloader.FirebaseModelDownloader
 import com.google.gson.*
 import org.tensorflow.lite.Interpreter
+import java.io.IOException
+import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.*
+import kotlin.collections.ArrayList
 
-
-class VisionViewModel : ViewModel() {
+//AndroidViewModel is a subclass of ViewModel that is aware of Application context
+//class VisionViewModel : ViewModel()
+//class NetworkViewModel(private val app: Application): AndroidViewModel(app) {
+class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
     // TODO: Implement the ViewModel
     private lateinit var functions: FirebaseFunctions
     var resultmessage = MutableLiveData<String>()
 
     private var myClassifier = MyClassifier()//Classifier(this)
 
+    var labels = ArrayList<String>()
+
+    companion object {
+        private const val TAG = "VisionViewModel"
+
+        private const val label_filename = "labels.txt" //4
+    }
+
     fun openCamera() {
         Log.i("VisionViewModel", "clicked image button ")
+    }
+
+    @Throws(IOException::class)
+    fun loadLines(): ArrayList<String> {
+        val s = Scanner(InputStreamReader(app.applicationContext.assets.open(label_filename)))
+        val labels = ArrayList<String>()
+        while (s.hasNextLine()) {
+            labels.add(s.nextLine())
+        }
+        s.close()
+        return labels
     }
 
     /**
@@ -136,6 +164,11 @@ class VisionViewModel : ViewModel() {
 
     }
 
+    //Custom model
+    fun cleanup() {
+        myClassifier.close()
+    }
+
     private fun annotateImage(requestJson: String): Task<JsonElement> {
         functions = Firebase.functions
         return functions
@@ -150,41 +183,18 @@ class VisionViewModel : ViewModel() {
             }
     }
 
+    //custom model
     fun runInterpreter(inputbitmap: Bitmap) {
         val result = myClassifier.classify(inputbitmap)
         Log.i("VisionViewModel", result)
-        //image classification model with an input shape of [1 224 224 3] floating-point values
-        //generate an input ByteBuffer from a Bitmap object
-//        val bitmap = Bitmap.createScaledBitmap(inputbitmap, 224, 224, true)
-//        val input = ByteBuffer.allocateDirect(224*224*3*4).order(ByteOrder.nativeOrder())
-//        for (y in 0 until 224) {
-//            for (x in 0 until 224) {
-//                val px = bitmap.getPixel(x, y)
-//
-//                // Get channel values from the pixel value.
-//                val r = Color.red(px)
-//                val g = Color.green(px)
-//                val b = Color.blue(px)
-//
-//                // Normalize channel values to [-1.0, 1.0]. This requirement depends on the model.
-//                // For example, some models might require values to be normalized to the range
-//                // [0.0, 1.0] instead.
-//                val rf = (r - 127) / 255f
-//                val gf = (g - 127) / 255f
-//                val bf = (b - 127) / 255f
-//
-//                input.putFloat(rf)
-//                input.putFloat(gf)
-//                input.putFloat(bf)
-//            }
-//        }
-//
-//        val bufferSize = 1000 * java.lang.Float.SIZE / java.lang.Byte.SIZE
-//        val modelOutput = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder())
-//        interpreter?.run(input, modelOutput)//an output shape of [1 1000] floating-point values
+        resultmessage.value = result
     }
 
     fun setupModel() {
+        //load labels
+        labels = loadLines()
+        myClassifier.labels = labels
+
         val conditions = CustomModelDownloadConditions.Builder()
             .requireWifi()
             .build()

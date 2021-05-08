@@ -19,6 +19,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Observer
+import sjsu.cmpelkk.myandroidmulti.Network.NetworkViewModel
 import sjsu.cmpelkk.myandroidmulti.R
 import sjsu.cmpelkk.myandroidmulti.databinding.VisionFragmentBinding
 import java.io.InputStream
@@ -107,11 +110,17 @@ class VisionFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+        viewModel.cleanup()
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         viewModel = ViewModelProvider(this).get(VisionViewModel::class.java)
+
+        viewModel.resultmessage.observe(viewLifecycleOwner, Observer { newresponse ->
+            binding.resulttextView.text = newresponse.toString() //display the result
+        })
+
         // TODO: Use the ViewModel
         viewModel.setupModel()
     }
