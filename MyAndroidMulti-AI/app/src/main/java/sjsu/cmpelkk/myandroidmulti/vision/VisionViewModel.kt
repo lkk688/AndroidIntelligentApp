@@ -49,6 +49,7 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
         private const val TAG = "VisionViewModel"
 
         private const val label_filename = "labels.txt" //4
+        private const val model_name = "classifierstart"//""mobilenetv2" //classifierstart
     }
 
     fun openCamera() {
@@ -199,7 +200,7 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
             .requireWifi()
             .build()
         FirebaseModelDownloader.getInstance()
-            .getModel("mobilenetv2", DownloadType.LOCAL_MODEL, conditions)//"classifierstart"
+            .getModel(model_name, DownloadType.LOCAL_MODEL, conditions)//"classifierstart"
             .addOnCompleteListener {
                 // Download complete. Depending on your app, you could enable the ML
                 // feature, or switch from the local model to the remote model, etc.

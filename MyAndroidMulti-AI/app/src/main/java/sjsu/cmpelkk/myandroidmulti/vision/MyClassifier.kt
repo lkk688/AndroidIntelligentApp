@@ -52,10 +52,6 @@ class MyClassifier{ //(private val context: Context) {
     }
 
     private fun initializeInterpreter(model: File) {
-        //load labels
-
-
-
         // Initialize TF Lite Interpreter with NNAPI enabled
         val options = Interpreter.Options()
         options.setUseNNAPI(true)
@@ -71,13 +67,16 @@ class MyClassifier{ //(private val context: Context) {
         val inputShape = interpreter.getInputTensor(0).shape()
         inputImageWidth = inputShape[1]
         inputImageHeight = inputShape[2]
-        modelInputSize = FLOAT_TYPE_SIZE * inputImageWidth * inputImageHeight * PIXEL_SIZE * 3
 
         //new add
-        val inputdatatype = interpreter.getInputTensor(0).dataType();//FLOAT32
+        val inputdatatype = interpreter.getInputTensor(0).dataType();//FLOAT32/UINT8
         if (inputdatatype.byteSize()==1)
         {
             QUANTIZED_model = true
+            modelInputSize = 1 * inputImageWidth * inputImageHeight * PIXEL_SIZE * 3
+        }else
+        {
+            modelInputSize = FLOAT_TYPE_SIZE * inputImageWidth * inputImageHeight * PIXEL_SIZE * 3
         }
         val outputdataShape = interpreter.getOutputTensor(0).shape() //{1, NUM_CLASSES}
         val probabilityDataType = interpreter.getOutputTensor(0).dataType() //FLOAT32
@@ -97,22 +96,27 @@ class MyClassifier{ //(private val context: Context) {
 
         var startTime: Long
         var elapsedTime: Long
+        var preprocessTime: Long
 
         // Preprocessing: resize the input
         startTime = System.nanoTime()
         val resizedImage = Bitmap.createScaledBitmap(bitmap, inputImageWidth, inputImageHeight, true)
-        val byteBuffer = convertBitmapToByterBuffer(resizedImage)
-        elapsedTime = (System.nanoTime() - startTime) / 1000000
-        Log.d(TAG, "Preprocessing time = " + elapsedTime + "ms")
 
-        startTime = System.nanoTime()
         var index = 0
         if (QUANTIZED_model)
         {
+            val byteBuffer = convertBitmapToByterBufferQ(resizedImage)
+            preprocessTime = (System.nanoTime() - startTime) / 1000000
+            Log.d(TAG, "Preprocessing time = " + preprocessTime + "ms")
+
             val result = Array(1) { ByteArray(OUTPUT_CLASSES_COUNT) }
             interpreter?.run(byteBuffer, result)
             index = getMaxResultq(result[0])
         }else {
+            val byteBuffer = convertBitmapToByterBuffer(resizedImage)
+            preprocessTime = (System.nanoTime() - startTime) / 1000000
+            Log.d(TAG, "Preprocessing time = " + preprocessTime + "ms")
+
             val result = Array(1) { FloatArray(OUTPUT_CLASSES_COUNT) }
 //        val bufferSize = OUTPUT_CLASSES_COUNT * java.lang.Float.SIZE / java.lang.Byte.SIZE //1000*
 //        val result = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder())
@@ -125,7 +129,7 @@ class MyClassifier{ //(private val context: Context) {
         Log.d(TAG, "Inference time = " + elapsedTime + "ms")
 
         val classname = labels?.get(index)
-        var stringresult = "Predicted index is $index, class is $classname \n Inference Time is $elapsedTime ms"
+        var stringresult = "Predicted index is $index, class is $classname \n Inference Time is $elapsedTime ms, preprocessTime is $preprocessTime ms"
         return stringresult//getOutputString(result[0])
     }
 
@@ -149,9 +153,9 @@ class MyClassifier{ //(private val context: Context) {
         val bitmap = Bitmap.createScaledBitmap(bitmap, inputImageWidth, inputImageHeight, true)
         //val input = ByteBuffer.allocateDirect(224*224*3*4).order(ByteOrder.nativeOrder())
         val input = ByteBuffer.allocateDirect(modelInputSize).order(ByteOrder.nativeOrder())
-        for (y in 0 until 224) {
-            for (x in 0 until 224) {
-                val px = bitmap.getPixel(x, y)
+        for (y in 0 until inputImageHeight) {
+            for (x in 0 until inputImageWidth) {
+                val px = bitmap.getPixel(x, y) //x is the width, y is the height
 
                 // Get channel values from the pixel value.
                 val r = Color.red(px)
@@ -168,6 +172,39 @@ class MyClassifier{ //(private val context: Context) {
                 input.putFloat(rf)
                 input.putFloat(gf)
                 input.putFloat(bf)
+            }
+        }
+        return input
+    }
+
+    private fun convertBitmapToByterBufferQ(bitmap: Bitmap): ByteBuffer {
+        val bitmap = Bitmap.createScaledBitmap(bitmap, inputImageWidth, inputImageHeight, true)
+        //val input = ByteBuffer.allocateDirect(224*224*3*4).order(ByteOrder.nativeOrder())
+        val input = ByteBuffer.allocateDirect(modelInputSize).order(ByteOrder.nativeOrder())
+        for (y in 0 until inputImageHeight) {
+            for (x in 0 until inputImageWidth) {
+                val px = bitmap.getPixel(x, y) //x is the width, y is the height
+
+                // Get channel values from the pixel value.
+                val r = Color.red(px)
+                val g = Color.green(px)
+                val b = Color.blue(px)
+
+                // Normalize channel values to [-1.0, 1.0]. This requirement depends on the model.
+                // For example, some models might require values to be normalized to the range
+                // [0.0, 1.0] instead.
+//                val rf = (r - 127) / 255f
+//                val gf = (g - 127) / 255f
+//                val bf = (b - 127) / 255f
+                input.put(r.toByte())
+                input.put(g.toByte())
+                input.put(b.toByte())
+                //input.putInt(g)
+                //input.putInt(b)
+
+//                input.putFloat(rf)
+//                input.putFloat(gf)
+//                input.putFloat(bf)
             }
         }
         return input
