@@ -8,6 +8,9 @@ apply plugin: 'kotlin-android-extensions'
 //apply plugin: 'com.android.application'
 apply plugin: 'com.google.gms.google-services'
 
+// Apply the Performance Monitoring plugin
+apply plugin: 'com.google.firebase.firebase-perf'
+
 android {
     compileSdkVersion 30
     buildToolsVersion "30.0.0"
@@ -91,7 +94,8 @@ dependencies {
 
     //implementation 'com.google.firebase:firebase-analytics:17.2.2'
     implementation 'com.firebaseui:firebase-ui-auth:6.2.0' // Using FirebaseUI to signin
-    implementation 'com.google.firebase:firebase-messaging:20.1.6'
+    //implementation 'com.google.firebase:firebase-messaging:20.1.6'
+    implementation 'com.google.firebase:firebase-messaging-ktx'
 
     //
     //implementation 'com.google.firebase:firebase-functions:19.2.0'
@@ -104,5 +108,14 @@ dependencies {
 
     // Also declare the dependency for the TensorFlow Lite library and specify its version
     implementation 'org.tensorflow:tensorflow-lite:2.3.0'
+
+    //Firebase remote config
+    //implementation 'com.google.firebase:firebase-config-ktx:20.0.4'
+    // Declare the dependencies for the Remote Config libraries
+    // When using the BoM, you don't specify versions in Firebase library dependencies
+    implementation 'com.google.firebase:firebase-config-ktx'
+
+    // Declare the dependency for the Performance Monitoring library
+    implementation 'com.google.firebase:firebase-perf-ktx'
 
 }

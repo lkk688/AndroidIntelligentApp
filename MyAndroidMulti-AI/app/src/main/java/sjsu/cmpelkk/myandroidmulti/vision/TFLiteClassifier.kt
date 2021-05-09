@@ -18,9 +18,9 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class MyClassifier{ //(private val context: Context) {
+class TFLiteClassifier{ //(private val context: Context) {
     companion object {
-        private const val TAG = "ImageClassifier"
+        private const val TAG = "TFLiteClassifier"
 
         private const val FLOAT_TYPE_SIZE = 4 //4
         private const val PIXEL_SIZE = 1

@@ -122,7 +122,8 @@ class VisionFragment : Fragment() {
         })
 
         // TODO: Use the ViewModel
-        viewModel.setupModel()
+        //viewModel.setupModel()
+        viewModel.setupModelviaRemoteConfig()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

@@ -24,6 +24,10 @@ import com.google.firebase.ml.modeldownloader.CustomModel
 import com.google.firebase.ml.modeldownloader.CustomModelDownloadConditions
 import com.google.firebase.ml.modeldownloader.DownloadType
 import com.google.firebase.ml.modeldownloader.FirebaseModelDownloader
+import com.google.firebase.perf.FirebasePerformance
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
+import com.google.firebase.remoteconfig.ktx.remoteConfig
+import com.google.firebase.remoteconfig.ktx.remoteConfigSettings
 import com.google.gson.*
 import org.tensorflow.lite.Interpreter
 import java.io.IOException
@@ -41,7 +45,11 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
     private lateinit var functions: FirebaseFunctions
     var resultmessage = MutableLiveData<String>()
 
-    private var myClassifier = MyClassifier()//Classifier(this)
+    private var myClassifier = TFLiteClassifier()//Classifier(this)
+    private lateinit var remoteConfig: FirebaseRemoteConfig
+    private var model_name = "classifierstart"//""mobilenetv2" //classifierstart
+
+    private val firebasePerformance = FirebasePerformance.getInstance()
 
     var labels = ArrayList<String>()
 
@@ -49,7 +57,6 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
         private const val TAG = "VisionViewModel"
 
         private const val label_filename = "labels.txt" //4
-        private const val model_name = "classifierstart"//""mobilenetv2" //classifierstart
     }
 
     fun openCamera() {
@@ -186,15 +193,56 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
 
     //custom model
     fun runInterpreter(inputbitmap: Bitmap) {
-        val result = myClassifier.classify(inputbitmap)
-        Log.i("VisionViewModel", result)
-        resultmessage.value = result
+        val classifyTrace = firebasePerformance.newTrace("classify")
+        classifyTrace.start()
+
+        //Classify Async operation
+        myClassifier.classifyAsync(inputbitmap)
+            .addOnSuccessListener {
+                classifyTrace.stop()
+                Log.i("VisionViewModel", it)
+                resultmessage.value = it
+            }
+            .addOnFailureListener {
+                resultmessage.value = "Error:"+it.localizedMessage
+            }
+
+        //Another option
+//        val result = myClassifier.classify(inputbitmap)
+//        Log.i("VisionViewModel", result)
+//        resultmessage.value = result
+    }
+
+    private fun configureRemoteConfig() {
+        remoteConfig = Firebase.remoteConfig
+        val configSettings = remoteConfigSettings {
+            minimumFetchIntervalInSeconds = 3600
+        }
+        remoteConfig.setConfigSettingsAsync(configSettings)
+    }
+
+    fun setupModelviaRemoteConfig(){
+        configureRemoteConfig()
+        remoteConfig.fetchAndActivate()
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    model_name = remoteConfig.getString("model_name")
+                    setupModel()
+                } else {
+                    Log.i(TAG, "Failed to fetch model name:")
+                }
+            }
+
     }
 
     fun setupModel() {
         //load labels
         labels = loadLines()
         myClassifier.labels = labels
+
+        //Firebase performance trace
+        val downloadTrace = firebasePerformance.newTrace("download_model")
+        downloadTrace.start()
 
         val conditions = CustomModelDownloadConditions.Builder()
             .requireWifi()
@@ -204,6 +252,8 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
             .addOnCompleteListener {
                 // Download complete. Depending on your app, you could enable the ML
                 // feature, or switch from the local model to the remote model, etc.
+                downloadTrace.stop()
+
                 val model = it.result
                 if (model == null) {
                     Log.i("VisionViewModel", "Failed to get model file.")
