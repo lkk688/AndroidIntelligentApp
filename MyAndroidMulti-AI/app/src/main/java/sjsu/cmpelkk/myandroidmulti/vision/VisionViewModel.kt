@@ -29,6 +29,10 @@ import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.remoteconfig.ktx.remoteConfig
 import com.google.firebase.remoteconfig.ktx.remoteConfigSettings
 import com.google.gson.*
+import com.google.mlkit.common.model.CustomRemoteModel
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.common.model.RemoteModelManager
+import com.google.mlkit.linkfirebase.FirebaseModelSource
 import org.tensorflow.lite.Interpreter
 import java.io.IOException
 import java.io.InputStreamReader
@@ -53,10 +57,16 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
 
     var labels = ArrayList<String>()
 
+    //MLKit
+    private var mlKitClassifier = MLKitClassifier()
+    var confidencethreshold = 0.4
+
     companion object {
         private const val TAG = "VisionViewModel"
 
         private const val label_filename = "labels.txt" //4
+
+        private const val useMLkit = true
     }
 
     fun openCamera() {
@@ -135,6 +145,7 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
         return base64encoded
     }
 
+    //Use Firebase function to call Cloud Vision API
     fun firebasemldetect(base64encoded: String) {
         // ...
         // Create json request to cloud vision
@@ -172,11 +183,7 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
 
     }
 
-    //Custom model
-    fun cleanup() {
-        myClassifier.close()
-    }
-
+    //Using Cloud Vision API
     private fun annotateImage(requestJson: String): Task<JsonElement> {
         functions = Firebase.functions
         return functions
@@ -191,32 +198,25 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
             }
     }
 
+    //Custom model
+    fun cleanup() {
+        myClassifier.close()
+    }
+
     //custom model
     fun runInterpreter(inputbitmap: Bitmap) {
-        val classifyTrace = firebasePerformance.newTrace("classify")
-        classifyTrace.start()
+        if (useMLkit==true) {
+            mlkitprocessimage(inputbitmap)
+        }else {
+            firebasemlprocessimage(inputbitmap)
+        }
 
-        //Classify Async operation
-        myClassifier.classifyAsync(inputbitmap)
-            .addOnSuccessListener {
-                classifyTrace.stop()
-                Log.i("VisionViewModel", it)
-                resultmessage.value = it
-            }
-            .addOnFailureListener {
-                resultmessage.value = "Error:"+it.localizedMessage
-            }
-
-        //Another option
-//        val result = myClassifier.classify(inputbitmap)
-//        Log.i("VisionViewModel", result)
-//        resultmessage.value = result
     }
 
     private fun configureRemoteConfig() {
         remoteConfig = Firebase.remoteConfig
         val configSettings = remoteConfigSettings {
-            minimumFetchIntervalInSeconds = 3600
+            minimumFetchIntervalInSeconds = 6 //3600
         }
         remoteConfig.setConfigSettingsAsync(configSettings)
     }
@@ -261,7 +261,12 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
                     Log.i("VisionViewModel", "Downloaded remote model: $model")
                     val modelFile = model?.file
                     if (modelFile !=null) {
-                        myClassifier.initialize(modelFile)
+                        if (useMLkit==true) {
+                            mlKitClassifier.setupLocalModel(modelFile)
+                        }else {
+                            myClassifier.initialize(modelFile)
+                        }
+
                     }
                 }
             }
@@ -269,5 +274,86 @@ class VisionViewModel(private val app: Application) : AndroidViewModel(app) {
                 Log.i("VisionViewModel", "Model download failed:")
             }
 
+    }
+
+    fun firebasemlprocessimage(bitmap: Bitmap) {
+        val classifyTrace = firebasePerformance.newTrace("classify")
+        classifyTrace.start()
+
+        //Classify Async operation
+        myClassifier.classifyAsync(bitmap)
+            .addOnSuccessListener {
+                classifyTrace.stop()
+                Log.i("VisionViewModel", it)
+                resultmessage.value = it
+            }
+            .addOnFailureListener {
+                resultmessage.value = "Error:"+it.localizedMessage
+            }
+
+        //Another option
+//        val result = myClassifier.classify(inputbitmap)
+//        Log.i("VisionViewModel", result)
+//        resultmessage.value = result
+    }
+
+    //MLkit
+//    fun setupMLKitModel() {
+//
+//        //mlKitClassifier.setupLocalModel()
+//
+//        // Specify the name you assigned in the Firebase console.
+//        val remoteModel =
+//            CustomRemoteModel
+//                .Builder(FirebaseModelSource.Builder("mobilenetv2").build())
+//                .build()
+//
+//        val downloadConditions = DownloadConditions.Builder()
+//            .requireWifi()
+//            .build()
+//        RemoteModelManager.getInstance().download(remoteModel, downloadConditions)
+//            .addOnSuccessListener {
+//                // Success.
+//                val model = it
+//                if (model == null) {
+//                    Log.i("VisionViewModel", "Failed to get model file.")
+//                } else {
+//                    Log.i("VisionViewModel", "Model downloaded:")
+//                }
+//            }
+//            .addOnFailureListener {
+//                Log.i("VisionViewModel", "Model download failed:")
+//            }
+//    }
+
+    fun mlkitprocessimage(bitmap: Bitmap) {
+        val inputimage = mlKitClassifier.imageFromBitmap(bitmap)
+        //val bytebuffer = mlKitClassifier.convertBitmapToByterBuffer(bitmap)
+        //val inputimage = mlKitClassifier.imageFromBuffer(bytebuffer, 0)
+        mlKitClassifier.detectInImage(inputimage)
+            .addOnSuccessListener {
+                if (it == null) {
+                    Log.i(TAG, "No labels detected")
+                } else {
+                    for (label in it) {
+                        val text = label.text
+                        val confidence = label.confidence
+                        val index = label.index
+                        val classname = labels[index]
+                        val str = String.format("Label %s, classname %s confidence %f \n", text, classname, confidence)
+                        if (confidence>confidencethreshold) {
+                            resultmessage.value += str
+                        }
+                        Log.i(
+                            TAG,
+                            String.format("Label %s, confidence %f", text, confidence)
+                        )
+                    }
+                }
+            }
+            .addOnFailureListener {
+                Log.i("VisionViewModel", "mlkitprocessimage failed:")
+                resultmessage.value = "Error:"+it.localizedMessage
+            }
     }
 }

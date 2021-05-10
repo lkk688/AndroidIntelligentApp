@@ -40,6 +40,10 @@ android {
         // for view binding :
         viewBinding = true
     }
+    aaptOptions {
+        noCompress "tflite"
+        // or noCompress "lite"
+    }
 }
 
 dependencies {
@@ -117,5 +121,10 @@ dependencies {
 
     // Declare the dependency for the Performance Monitoring library
     implementation 'com.google.firebase:firebase-perf-ktx'
+
+    // Image labeling feature with model downloaded
+    // from firebase
+    implementation 'com.google.mlkit:image-labeling-custom:16.3.1'
+    implementation 'com.google.mlkit:linkfirebase:16.1.1'
 
 }

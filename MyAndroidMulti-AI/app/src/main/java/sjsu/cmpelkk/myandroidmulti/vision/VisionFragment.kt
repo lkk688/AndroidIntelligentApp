@@ -124,6 +124,9 @@ class VisionFragment : Fragment() {
         // TODO: Use the ViewModel
         //viewModel.setupModel()
         viewModel.setupModelviaRemoteConfig()
+
+        //MLKit
+        //viewModel.setupMLKitModel()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -142,11 +145,13 @@ class VisionFragment : Fragment() {
             //binding.photoimageView.setImageBitmap(image)
             var bitmap: Bitmap = MediaStore.Images.Media.getBitmap(requireActivity().contentResolver, outputFileUri)
             // Scale down bitmap size
-            bitmap = viewModel.scaleBitmapDown(bitmap, 640)
+            bitmap = viewModel.scaleBitmapDown(bitmap, 300)//640
+
+            //Using CloudVision API
             //val base64encoded = viewModel.base64(bitmap)
             //viewModel.firebasemldetect(base64encoded)
 
-            //Firebase ML
+            //Use custom model in Firebase ML or use MLkit for image classification
             viewModel.runInterpreter(bitmap)
 
         }
