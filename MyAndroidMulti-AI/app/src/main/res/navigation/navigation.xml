@@ -74,5 +74,14 @@
         android:id="@+id/visionFragment"
         android:name="sjsu.cmpelkk.myandroidmulti.vision.VisionFragment"
         android:label="vision_fragment"
-        tools:layout="@layout/vision_fragment" />
+        tools:layout="@layout/vision_fragment" >
+        <action
+            android:id="@+id/action_visionFragment_to_cameraActivity"
+            app:destination="@id/cameraActivity" />
+    </fragment>
+    <activity
+        android:id="@+id/cameraActivity"
+        android:name="sjsu.cmpelkk.myandroidmulti.vision.CameraActivity"
+        android:label="activity_camera"
+        tools:layout="@layout/activity_camera" />
 </navigation>

@@ -21,6 +21,7 @@ import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
+import androidx.navigation.Navigation
 import sjsu.cmpelkk.myandroidmulti.Network.NetworkViewModel
 import sjsu.cmpelkk.myandroidmulti.R
 import sjsu.cmpelkk.myandroidmulti.databinding.VisionFragmentBinding
@@ -75,6 +76,11 @@ class VisionFragment : Fragment() {
                 takePhotoIntent.putExtra(MediaStore.EXTRA_OUTPUT, outputFileUri)
                 startActivityForResult(takePhotoIntent, ODT_REQUEST_IMAGE_CAPTURE)
             }
+        }
+
+        binding.buttonopencamera.setOnClickListener {
+            //val action = VisionFragmentDirections.ac
+            Navigation.findNavController(it).navigate(R.id.action_visionFragment_to_cameraActivity)
         }
 
         if (ContextCompat.checkSelfPermission(

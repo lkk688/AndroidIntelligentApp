@@ -35,4 +35,10 @@
     <string name="SendFirestoremessage">Send Firestore Message</string>
     <string name="classificationresult">Classification result</string>
 
+    <string name="capture_button">Capture</string>
+    <string name="torch_button">Torch</string>
+    <string name="photo">Photo</string>
+    <string name="video">Video</string>
+    <string name="opencamera">Open Camera</string>
+
 </resources>

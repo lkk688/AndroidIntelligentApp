@@ -6,13 +6,17 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-feature android:name="android.hardware.camera"
+
+    <uses-feature
+        android:name="android.hardware.camera"
         android:required="true" />
 
     <queries>
+
         <!-- Browser -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
+
             <data android:scheme="http" />
         </intent>
 
@@ -34,7 +38,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name="sjsu.cmpelkk.myandroidmulti.MainActivity">
+        <activity android:name=".vision.CameraActivity"></activity>
+        <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -66,11 +71,9 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="@string/fcm_notification_channel_ID" />
-
         <meta-data
             android:name="firebase_performance_logcat_enabled"
             android:value="true" />
-
     </application>
 
 </manifest>
